@@ -80,7 +80,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px
 <div id="toast"></div>
 <script>
 (() => {
- const SUPABASE_URL = "https://zdknwjwjzqmeazpdqtwe.supabase.co"; // Add Project URL from Supabase
+ const SUPABASE_URL = "https://zdknwjwjzqmeazpdqtwe.supabase.co/rest/v1/"; // Add Project URL from Supabase
  const SUPABASE_ANON_KEY = "sb_publishable_QsQ6wWgush85Co20t_3xxg__iIyT-9G"; // Add anon/public key from Supabase
  const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
  const db = CLOUD ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY) : null;

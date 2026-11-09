@@ -46,6 +46,17 @@
    <section id="dealerSearchResultsSection" class="hidden" style="margin-top:16px"><div class="section-head"><h2>Dealer results</h2><span id="dealerListCount" class="status"></span></div><div id="dashboardDealerList" class="dealer-list"></div></section>
   </section>
  </main>
+ <main id="allCustomersView" class="hidden">
+  <section class="panel">
+   <div class="detail-head"><button id="allCustomersBack" class="back-btn">←</button><div><h2 style="margin:0">All customers</h2><p>View every customer and their credit, payments and pending balance.</p></div></div>
+   <div class="report-grid" style="margin:16px 0">
+    <div class="stat"><small>Total customers</small><strong id="allCustomerCount">0</strong></div>
+    <div class="stat"><small>Total pending</small><strong id="allCustomerPending">₹0</strong></div>
+   </div>
+   <div class="field"><label for="allCustomerSearch">Search customers</label><div class="search-wrap" style="margin:0"><span class="search-icon">⌕</span><input id="allCustomerSearch" placeholder="Search name or phone..." autocomplete="off"></div></div>
+   <div id="allCustomersList" class="recent-list" style="margin-top:14px"></div>
+  </section>
+ </main>
  <main id="dealerView" class="hidden">
   <section class="panel">
    <div class="detail-head"><button id="dealerBack" class="back-btn">←</button><div><h2 style="margin:0">Dealer expenses</h2><p>Record the amount you pay each supplier. No purchase or due tracking.</p></div></div>
@@ -70,6 +81,7 @@
   <button type="button" class="secondary menu-option" id="navDashboard">⌂ <span>Dashboard</span></button>
   <p class="status" style="font-weight:700;letter-spacing:.06em;margin:22px 0 10px">CUSTOMERS</p>
   <button type="button" class="secondary menu-option" id="navAddCustomer">＋ <span>Add customer</span></button>
+  <button type="button" class="secondary menu-option" id="navAllCustomers">☷ <span>All customers</span></button>
   <p class="status" style="font-weight:700;letter-spacing:.06em;margin:22px 0 10px">DEALERS</p>
   <button type="button" class="secondary menu-option" id="navAddDealer">＋ <span>Add dealer</span></button>
   <button type="button" class="secondary menu-option" id="navDealerExpenses">▤ <span>Dealer expenses</span></button>
@@ -131,7 +143,7 @@
   document.querySelectorAll('[data-pending-customer-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.pendingCustomerId));
   $('overallDealerPaid').textContent=money(dealerEntries.filter(x=>x.type==='payment').reduce((sum,x)=>sum+Number(x.amount),0));
   renderDashboardDealers();
-  renderDetail();renderReport();renderDealers();renderDealerDetail();
+  renderDetail();renderReport();renderDealers();renderDealerDetail();if(!$('allCustomersView').classList.contains('hidden'))renderAllCustomers();
  }
  function renderDashboardDealers(){
   const q=($('dealerSearch')?.value||'').trim().toLocaleLowerCase('en-IN');
@@ -142,7 +154,25 @@
   document.querySelectorAll('[data-dashboard-dealer-id]').forEach(b=>b.onclick=()=>{selectedDealer=b.dataset.dashboardDealerId;$('homeView').classList.add('hidden');$('dealerDetailView').classList.remove('hidden');renderDealerDetail();});
  }
  function customerCard(c,compact=false){return `<button class="recent-item" data-customer-id="${c.id}"><span class="avatar">${esc(c.name.split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase())}</span><span class="recent-meta"><strong>${esc(c.name)}</strong><small>${esc(c.phone||'Customer account')}</small></span><span class="recent-balance">${money(balance(c.id))}<br><small class="muted">balance</small></span></button>`;}
- function hidePages(){['homeView','detailView','dealerView','dealerDetailView','addCustomerView','addDealerView'].forEach(id=>$(id).classList.add('hidden'));}
+ function renderAllCustomers(){
+  const q=($('allCustomerSearch')?.value||'').trim().toLocaleLowerCase('en-IN');
+  const rows=customers.map(c=>{
+   const customerEntries=entries.filter(x=>x.customer_id===c.id);
+   const credit=customerEntries.filter(x=>x.type==='credit').reduce((sum,x)=>sum+Number(x.amount),0);
+   const paid=customerEntries.filter(x=>x.type==='payment').reduce((sum,x)=>sum+Number(x.amount),0);
+   return {customer:c,credit,paid,pending:credit-paid};
+  }).filter(x=>!q||(x.customer.name||'').toLocaleLowerCase('en-IN').includes(q)||(x.customer.phone||'').includes(q))
+    .sort((a,b)=>(a.customer.name||'').localeCompare(b.customer.name||''));
+  $('allCustomerCount').textContent=customers.length;
+  $('allCustomerPending').textContent=money(customers.reduce((sum,c)=>sum+Math.max(0,balance(c.id)),0));
+  $('allCustomersList').innerHTML=rows.length?rows.map(x=>`<button class="recent-item" data-all-customer-id="${x.customer.id}" style="width:100%;text-align:left"><span class="avatar">${esc((x.customer.name||'C').split(/\\s+/).slice(0,2).map(y=>y[0]||'').join('').toUpperCase())}</span><span class="recent-meta"><strong>${esc(x.customer.name)}</strong><small>${esc(x.customer.phone||'No phone number')}<br>Credit ${money(x.credit)} · Paid ${money(x.paid)}</small></span><span class="recent-balance">${money(x.pending)}<br><small class="muted">balance</small></span></button>`).join(''):'<div class="empty">No customers found.</div>';
+  document.querySelectorAll('[data-all-customer-id]').forEach(b=>b.onclick=()=>openCustomer(b.dataset.allCustomerId));
+ }
+ function showAllCustomers(){
+  hidePages();$('allCustomersView').classList.remove('hidden');selected=null;selectedDealer=null;
+  $('allCustomerSearch').value='';renderAllCustomers();closeDrawer();
+ }
+ function hidePages(){['homeView','allCustomersView','detailView','dealerView','dealerDetailView','addCustomerView','addDealerView'].forEach(id=>$(id).classList.add('hidden'));}
  function openCustomer(id){selected=id;recentIds=[id,...recentIds.filter(x=>x!==id)].slice(0,3);localStorage.setItem('tealedger_recent',JSON.stringify(recentIds));hidePages();$('detailView').classList.remove('hidden');render();closeDrawer();}
  function showHome(){hidePages();$('homeView').classList.remove('hidden');selected=null;selectedDealer=null;render();closeDrawer();}
  function showAddCustomer(){hidePages();$('addCustomerView').classList.remove('hidden');$('newName').focus();closeDrawer();}
@@ -256,7 +286,7 @@
  }
  $('addCustomer').onclick=async()=>{await addCustomer();showHome();};$('addDealer').onclick=addDealer;$('dealerBack').onclick=showHome;$('addCustomerBack').onclick=showHome;$('cancelAdd').onclick=showHome;$('addDealerBack').onclick=showHome;$('cancelDealerAdd').onclick=showHome;$('dealerMonth').onchange=()=>{renderDealers();renderDealerDetail();};$('search').oninput=render;$('dealerSearch').oninput=renderDashboardDealers;$('reportMonth').onchange=renderReport;
  $('pendingCard').onclick=()=>{$('pendingSection').classList.toggle('hidden');if(!$('pendingSection').classList.contains('hidden'))$('pendingSection').scrollIntoView({behavior:'smooth',block:'start'});};$('closePending').onclick=()=>$('pendingSection').classList.add('hidden');
- $('menuOpen').onclick=openDrawer;$('menuClose').onclick=closeDrawer;$('drawerBackdrop').onclick=closeDrawer;$('navDashboard').onclick=showHome;$('navAddCustomer').onclick=showAddCustomer;$('navAddDealer').onclick=showAddDealer;$('navDealerExpenses').onclick=showDealerList;
+ $('menuOpen').onclick=openDrawer;$('menuClose').onclick=closeDrawer;$('drawerBackdrop').onclick=closeDrawer;$('navDashboard').onclick=showHome;$('navAddCustomer').onclick=showAddCustomer;$('navAllCustomers').onclick=showAllCustomers;$('allCustomersBack').onclick=showHome;$('allCustomerSearch').oninput=renderAllCustomers;$('navAddDealer').onclick=showAddDealer;$('navDealerExpenses').onclick=showDealerList;
  $('logout').onclick=async()=>{if(CLOUD)await db.auth.signOut();user=null;$('app').classList.add('hidden');$('auth').classList.remove('hidden');};
  if(CLOUD){
   $('setupNotice').classList.add('hidden');

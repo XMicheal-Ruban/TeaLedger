@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TeaLedger — Shop Credit Book</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#18202b;--muted:#697586;--line:#e7eaf0;--brand:#176b52;--brand2:#e7f4ef;--red:#b42318;--amber:#9a6700}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+button,input,select{font:inherit}button{cursor:pointer;border:0;border-radius:10px;padding:11px 14px;font-weight:650;background:var(--brand);color:white}
+button.secondary{background:#eef1f5;color:#263244}button.danger{background:#fff0ef;color:var(--red)}button:disabled{opacity:.5;cursor:not-allowed}
+.wrap{max-width:1120px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:20px}
+.brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;border-radius:13px;background:var(--brand);color:white;display:grid;place-items:center;font-size:22px}
+h1{font-size:22px;margin:0}h2{font-size:18px;margin:0 0 14px}p{color:var(--muted);margin:4px 0}
+.pill{font-size:12px;border-radius:20px;padding:5px 9px;background:var(--brand2);color:var(--brand);font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.stat,.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px}
+.stat small{display:block;color:var(--muted);font-weight:600}.stat strong{font-size:25px;display:block;margin-top:7px}
+.columns{display:grid;grid-template-columns:350px 1fr;gap:16px}.stack{display:grid;gap:16px}.field{display:grid;gap:6px;margin:10px 0}.field label{font-size:13px;color:var(--muted);font-weight:650}
+input,select{width:100%;border:1px solid #d9dee7;border-radius:10px;padding:11px;background:white;color:var(--ink);min-width:0}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row .fit{flex:0 0 auto}
+.list{display:grid;gap:7px;max-height:520px;overflow:auto}.customer{width:100%;text-align:left;background:white;color:var(--ink);border:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;padding:12px}
+.customer.active{border-color:var(--brand);background:var(--brand2)}.customer small{display:block;color:var(--muted);font-weight:400}
+.amount{font-weight:750;font-variant-numeric:tabular-nums}.muted{color:var(--muted)}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tab{background:#eef1f5;color:#344054}.tab.active{background:var(--brand);color:white}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);font-size:14px}th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.empty{text-align:center;padding:28px;color:var(--muted)}.hidden{display:none!important}.right{text-align:right}.notice{padding:12px;border-radius:11px;background:#fff7e6;color:#805b00;font-size:13px;margin:10px 0}
+.auth{max-width:420px;margin:8vh auto}.auth .panel{padding:24px}.status{font-size:12px;color:var(--muted)}.status.good{color:var(--brand)}.status.bad{color:var(--red)}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#18202b;color:white;padding:11px 16px;border-radius:10px;display:none;z-index:9}
+@media(max-width:800px){.wrap{padding:14px}.grid{grid-template-columns:repeat(2,1fr)}.columns{grid-template-columns:1fr}.list{max-height:280px}.top{align-items:flex-start}.top .row{flex-direction:column;align-items:flex-end}}
+@media(max-width:420px){.stat strong{font-size:21px}.top h1{font-size:19px}}
+</style></head>
+<body>
+<div id="auth" class="auth wrap">
+ <div class="panel">
+  <div class="brand"><div class="logo">☕</div><div><h1>TeaLedger</h1><p>Shop credit book</p></div></div>
+  <div id="setupNotice" class="notice">Cloud backup is not configured yet. You can use this app on this device in local mode. To enable shared online backup, follow SETUP.md.</div>
+  <div class="field"><label>Email</label><input id="email" type="email" placeholder="you@example.com"></div>
+  <div class="field"><label>Password</label><input id="password" type="password" placeholder="At least 6 characters"></div>
+  <div class="row"><button id="signIn">Sign in</button><button id="signUp" class="secondary">Create account</button></div>
+  <p id="authMsg" class="status" style="margin-top:12px"></p>
+  <p class="status">Cloud mode requires your own Supabase project. Local mode stores records in this browser only.</p>
+ </div>
+</div>
+<div id="app" class="wrap hidden">
+ <header class="top">
+  <div class="brand"><div class="logo">☕</div><div><h1>TeaLedger</h1><p>Customer credit management</p></div></div>
+  <div class="row" style="max-width:310px"><span id="syncStatus" class="status">Local mode</span><button id="logout" class="secondary fit">Sign out</button></div>
+ </header>
+ <section class="grid">
+  <div class="stat"><small>Total outstanding</small><strong id="totalOutstanding">₹0</strong></div>
+  <div class="stat"><small>Active customers</small><strong id="customerCount">0</strong></div>
+  <div class="stat"><small>Today's credit</small><strong id="todayCredit">₹0</strong></div>
+  <div class="stat"><small>Payments received this month</small><strong id="monthPayments">₹0</strong></div>
+ </section>
+ <div class="columns">
+  <div class="stack">
+   <section class="panel">
+    <h2>Add customer</h2>
+    <div class="field"><label>Customer name *</label><input id="newName" placeholder="e.g. Ramesh"></div>
+    <div class="field"><label>Phone (optional)</label><input id="newPhone" inputmode="tel" placeholder="Phone number"></div>
+    <button id="addCustomer" style="width:100%">Add customer</button>
+   </section>
+   <section class="panel">
+    <div class="row"><h2 style="margin:0">Customers</h2><span id="listCount" class="status right">0</span></div>
+    <div class="field"><input id="search" placeholder="Search customers..."></div>
+    <div id="customerList" class="list"><div class="empty">No customers yet. Add your first customer.</div></div>
+   </section>
+  </div>
+  <main class="stack">
+   <section class="panel" id="detailPanel">
+    <div class="empty">Select a customer to view their ledger.</div>
+   </section>
+   <section class="panel">
+    <div class="row"><h2 style="margin:0">Monthly report</h2><input id="reportMonth" type="month" style="max-width:180px"></div>
+    <div id="reportContent" class="empty">Choose a customer to view their monthly report.</div>
+   </section>
+  </main>
+ </div>
+</div>
+<div id="toast"></div>
+<script>
+(() => {
+ const SUPABASE_URL = "https://zdknwjwjzqmeazpdqtwe.supabase.co"; // Add Project URL from Supabase
+ const SUPABASE_ANON_KEY = "sb_publishable_QsQ6wWgush85Co20t_3xxg__iIyT-9G"; // Add anon/public key from Supabase
+ const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
+ const db = CLOUD ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY) : null;
+ const $ = id => document.getElementById(id);
+ const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(n||0));
+ const dateNow = () => new Date().toISOString().slice(0,10);
+ const monthNow = () => dateNow().slice(0,7);
+ let user=null, customers=[], entries=[], selected=null, mode=CLOUD?'cloud':'local';
+ let local = JSON.parse(localStorage.getItem('tealedger_data')||'{"customers":[],"entries":[]}');
+ const saveLocal=()=>{localStorage.setItem('tealedger_data',JSON.stringify(local));};
+ const toast = msg=>{ $('toast').textContent=msg;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',2400); };
+ const msg = (id,s)=>$(id).textContent=s;
+ const uid=()=>crypto.randomUUID();
+ async function load(){
+  if(CLOUD && user){
+   const [c,e]=await Promise.all([db.from('customers').select('*').order('name'),db.from('ledger_entries').select('*').order('entry_date',{ascending:false})]);
+   if(c.error||e.error) throw (c.error||e.error);
+   customers=c.data;entries=e.data;
+  } else {customers=local.customers;entries=local.entries;}
+  render();
+ }
+ async function addCustomer(){
+  const name=$('newName').value.trim(), phone=$('newPhone').value.trim();
+  if(!name)return toast('Enter a customer name.');
+  const item={id:uid(),name,phone,created_at:new Date().toISOString()};
+  if(CLOUD){const {error}=await db.from('customers').insert({id:item.id,name,phone});if(error)return toast(error.message);}
+  else {local.customers.push(item);saveLocal();}
+  $('newName').value='';$('newPhone').value='';await load();toast('Customer added.');
+ }
+ function balance(id){return entries.filter(x=>x.customer_id===id).reduce((s,x)=>s+(x.type==='credit'?Number(x.amount):-Number(x.amount)),0);}
+ function render(){
+  const today=dateNow(),month=monthNow();
+  $('totalOutstanding').textContent=money(customers.reduce((s,c)=>s+balance(c.id),0));
+  $('customerCount').textContent=customers.length;
+  $('todayCredit').textContent=money(entries.filter(x=>x.entry_date===today&&x.type==='credit').reduce((s,x)=>s+Number(x.amount),0));
+  $('monthPayments').textContent=money(entries.filter(x=>x.entry_date?.startsWith(month)&&x.type==='payment').reduce((s,x)=>s+Number(x.amount),0));
+  const q=$('search').value.toLowerCase();
+  const shown=customers.filter(c=>c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
+  $('listCount').textContent=shown.length;
+  $('customerList').innerHTML=shown.length?shown.map(c=>`<button class="customer ${selected===c.id?'active':''}" data-id="${c.id}"><span><b>${esc(c.name)}</b><small>${esc(c.phone||'No phone')}</small></span><span class="amount">${money(balance(c.id))}</span></button>`).join(''):'<div class="empty">No matching customers.</div>';
+  document.querySelectorAll('.customer').forEach(b=>b.onclick=()=>{selected=b.dataset.id;render();});
+  renderDetail();renderReport();
+ }
+ function renderDetail(){
+  const c=customers.find(x=>x.id===selected);
+  if(!c){$('detailPanel').innerHTML='<div class="empty">Select a customer to view their ledger.</div>';return;}
+  const rows=entries.filter(x=>x.customer_id===c.id).sort((a,b)=>(b.entry_date||'').localeCompare(a.entry_date||'')||(b.created_at||'').localeCompare(a.created_at||''));
+  $('detailPanel').innerHTML=`
+   <div class="row"><div><h2>${esc(c.name)}</h2><p>${esc(c.phone||'No phone number')}</p></div><div class="right"><small class="muted">Current balance</small><div class="amount" style="font-size:24px">${money(balance(c.id))}</div></div></div>
+   <div class="row" style="margin:16px 0 6px"><div class="field"><label>Entry date</label><input id="entryDate" type="date" value="${dateNow()}"></div><div class="field"><label>Amount (₹)</label><input id="entryAmount" type="number" min="0.01" step="0.01" placeholder="0.00"></div></div>
+   <div class="field"><label>Note (optional)</label><input id="entryNote" placeholder="Tea, snacks, groceries..."></div>
+   <div class="row"><button id="creditBtn">Add credit</button><button id="paymentBtn" class="secondary">Record payment</button></div>
+   <div class="row" style="margin-top:18px"><h2 style="margin:0">Transaction history</h2><button id="exportBtn" class="secondary fit">Export CSV</button></div>
+   ${rows.length?`<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Details</th><th class="right">Credit</th><th class="right">Payment</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.entry_date)}</td><td>${esc(x.note||'—')}</td><td class="right">${x.type==='credit'?money(x.amount):'—'}</td><td class="right">${x.type==='payment'?money(x.amount):'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No transactions yet.</div>'}`;
+  $('creditBtn').onclick=()=>addEntry('credit');$('paymentBtn').onclick=()=>addEntry('payment');$('exportBtn').onclick=exportCsv;
+ }
+ async function addEntry(type){
+  const amount=Number($('entryAmount').value),date=$('entryDate').value,note=$('entryNote').value.trim();
+  if(!(amount>0)||!Number.isFinite(amount))return toast('Enter a valid amount.');
+  if(!date)return toast('Choose a date.');
+  const item={id:uid(),customer_id:selected,entry_date:date,type,amount,note,created_at:new Date().toISOString()};
+  if(CLOUD){const {error}=await db.from('ledger_entries').insert({id:item.id,customer_id:item.customer_id,entry_date:date,type,amount,note});if(error)return toast(error.message);}
+  else {local.entries.push(item);saveLocal();}
+  await load();toast(type==='credit'?'Credit added.':'Payment recorded.');
+ }
+ function renderReport(){
+  const c=customers.find(x=>x.id===selected),m=$('reportMonth').value||monthNow();
+  if(!c){$('reportContent').textContent='Choose a customer to view their monthly report.';return;}
+  const prior=entries.filter(x=>x.customer_id===c.id&&x.entry_date<m+'-01');
+  const current=entries.filter(x=>x.customer_id===c.id&&x.entry_date.startsWith(m));
+  const net=a=>a.reduce((s,x)=>s+(x.type==='credit'?Number(x.amount):-Number(x.amount)),0);
+  const opening=net(prior),credit=current.filter(x=>x.type==='credit').reduce((s,x)=>s+Number(x.amount),0),paid=current.filter(x=>x.type==='payment').reduce((s,x)=>s+Number(x.amount),0);
+  $('reportContent').innerHTML=`<div class="grid" style="grid-template-columns:repeat(2,1fr);margin-top:12px"><div class="stat"><small>Opening balance</small><strong>${money(opening)}</strong></div><div class="stat"><small>New credit</small><strong>${money(credit)}</strong></div><div class="stat"><small>Payments</small><strong>${money(paid)}</strong></div><div class="stat"><small>Closing balance</small><strong>${money(opening+credit-paid)}</strong></div></div>`;
+ }
+ function exportCsv(){
+  const c=customers.find(x=>x.id===selected);if(!c)return;
+  const rows=entries.filter(x=>x.customer_id===selected).sort((a,b)=>a.entry_date.localeCompare(b.entry_date));
+  const csv=[['Date','Type','Amount','Note'],...rows.map(x=>[x.entry_date,x.type,x.amount,x.note||''])].map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=(c.name.replace(/[^a-z0-9]/gi,'_')+'_ledger.csv');a.click();URL.revokeObjectURL(a.href);
+ }
+ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+ async function start(){
+  $('auth').classList.add('hidden');$('app').classList.remove('hidden');
+  $('syncStatus').textContent=CLOUD?'Cloud backup connected':'Local mode — this browser only';
+  $('syncStatus').className='status '+(CLOUD?'good':'');
+  $('reportMonth').value=monthNow();await load();
+ }
+ $('addCustomer').onclick=addCustomer;$('search').oninput=render;$('reportMonth').onchange=renderReport;
+ $('logout').onclick=async()=>{if(CLOUD)await db.auth.signOut();user=null;$('app').classList.add('hidden');$('auth').classList.remove('hidden');};
+ if(CLOUD){
+  $('setupNotice').classList.add('hidden');
+  $('signIn').onclick=async()=>{const {data,error}=await db.auth.signInWithPassword({email:$('email').value,password:$('password').value});if(error)return msg('authMsg',error.message);user=data.user;await start();};
+  $('signUp').onclick=async()=>{const {error}=await db.auth.signUp({email:$('email').value,password:$('password').value});msg('authMsg',error?error.message:'Account created. Check your email if confirmation is enabled, then sign in.');};
+  db.auth.getSession().then(async({data})=>{if(data.session){user=data.session.user;start();}});
+ } else {
+  $('signIn').onclick=()=>start();$('signUp').onclick=()=>{toast('Local mode does not need an account. Press Sign in to open your ledger.');};
+ }
+})();
+</script></body></html>

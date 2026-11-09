@@ -245,6 +245,8 @@
    <div class="row" style="margin-top:18px"><h2 style="margin:0">Transaction history</h2><button id="exportBtn" class="secondary fit">Export CSV</button></div>
    ${rows.length?`<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Details</th><th class="right">Credit</th><th class="right">Payment</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.entry_date)}</td><td>${esc(x.note||'—')}</td><td class="right">${x.type==='credit'?money(x.amount):'—'}</td><td class="right">${x.type==='payment'?money(x.amount):'—'}</td><td><button class="danger" data-delete-customer-entry="${x.id}" style="padding:6px 9px">Delete</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No transactions yet.</div>'}`;
   $('backHome').onclick=showHome;$('creditBtn').onclick=()=>addEntry('credit');$('paymentBtn').onclick=()=>addEntry('payment');$('exportBtn').onclick=exportCsv;
+  $('entryAmount').addEventListener('input', updateEntryAmountPreview);
+updateEntryAmountPreview();
   document.querySelectorAll('[data-delete-customer-entry]').forEach(b=>b.onclick=()=>deleteCustomerEntry(b.dataset.deleteCustomerEntry));
  }
  async function deleteCustomerEntry(id){
@@ -253,8 +255,17 @@
   else{local.entries=local.entries.filter(x=>x.id!==id);saveLocal();}
   await load();renderDetail();renderReport();toast('Customer transaction deleted.');
  }
+ function calculateAmountExpression(raw){
+  const input=String(raw||'').replace(/\s+/g,'');if(!input)return null;
+  const tokens=input.match(/(?:\d+(?:\.\d*)?|\.\d+)|[()+*/-]/g)||[];
+  if(tokens.join('')!==input)return null;let i=0;
+  function factor(){const t=tokens[i++];if(t==='+' )return factor();if(t==='-')return -factor();if(t==='('){const v=expression();if(tokens[i++]!==')')throw Error('paren');return v;}if(t===undefined||!/^\d*\.?\d+$/.test(t))throw Error('number');return Number(t);}
+  function term(){let v=factor();while(tokens[i]==='*'||tokens[i]==='/'){const op=tokens[i++],n=factor();if(op==='/'&&n===0)throw Error('zero');v=op==='*'?v*n:v/n;}return v;}
+  function expression(){let v=term();while(tokens[i]==='+'||tokens[i]==='-'){const op=tokens[i++],n=term();v=op==='+'?v+n:v-n;}return v;}
+  try{const result=expression();return i===tokens.length&&Number.isFinite(result)?result:null;}catch(e){return null;}
+ }
  async function addEntry(type){
-  const amount=Number($('entryAmount').value),date=$('entryDate').value,note=$('entryNote').value.trim();
+  const amount = calculateAmountExpression($('entryAmount').value);
   if(!(amount>0)||!Number.isFinite(amount))return toast('Enter a valid amount.');
   if(!date)return toast('Choose a date.');
   const item={id:uid(),customer_id:selected,entry_date:date,type,amount,note,created_at:new Date().toISOString()};

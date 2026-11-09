@@ -72,8 +72,8 @@
 <div id="toast"></div>
 <script>
 (() => {
- const SUPABASE_URL = ""; // Add Project URL from Supabase
- const SUPABASE_ANON_KEY = ""; // Add anon/public key from Supabase
+ const SUPABASE_URL = "https://zdknwjwjzqmeazpdqtwe.supabase.co"; // Add Project URL from Supabase
+ const SUPABASE_ANON_KEY = "sb_publishable_QsQ6wWgush85Co20t_3xxg__iIyT-9G"; // Add anon/public key from Supabase
  const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
  const db = CLOUD ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY) : null;
  const $ = id => document.getElementById(id);

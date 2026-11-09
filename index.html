@@ -84,6 +84,8 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px
  const SUPABASE_ANON_KEY = "sb_publishable_QsQ6wWgush85Co20t_3xxg__iIyT-9G"; // Add anon/public key from Supabase
  const CLOUD = !!(SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase);
  const db = CLOUD ? window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY) : null;
+ console.log("Supabase URL:", db.supabaseUrl);
+ console.log("Auth URL:", db.auth.url);
  const $ = id => document.getElementById(id);
  const money = n => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(n||0));
  const dateNow = () => new Date().toISOString().slice(0,10);

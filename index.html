@@ -233,13 +233,18 @@
   else{local.dealerEntries=local.dealerEntries||[];local.dealerEntries.push(item);saveLocal();}
   await load();toast('Dealer payment recorded.');
  }
+ function updateEntryAmountPreview(){
+  const amount=calculateAmountExpression($('entryAmount').value);
+  $('entryAmountPreview').textContent=amount!==null&&amount>0?'Calculated amount: '+money(amount):'Calculated amount: —';
+ }
  function renderDetail(){
   const c=customers.find(x=>x.id===selected);
   if(!c){$('detailPanel').innerHTML='<div class="empty">Select a customer to view their ledger.</div>';return;}
   const rows=entries.filter(x=>x.customer_id===c.id).sort((a,b)=>(b.entry_date||'').localeCompare(a.entry_date||'')||(b.created_at||'').localeCompare(a.created_at||''));
   $('detailPanel').innerHTML=`
    <div class="detail-head"><button id="backHome" class="back-btn">←</button><div><h2 style="margin:0">${esc(c.name)}</h2><p>${esc(c.phone||'No phone number')}</p></div><div class="detail-balance"><small class="muted">Current balance</small><strong>${money(balance(c.id))}</strong></div></div>
-   <div class="entry-grid" style="margin:16px 0 6px"><div class="field"><label>Entry date</label><input id="entryDate" type="date" value="${dateNow()}"></div><div class="field"><label>Amount (₹)</label><input id="entryAmount" type="number" min="0.01" step="0.01" placeholder="0.00"></div></div>
+   <div class="entry-grid" style="margin:16px 0 6px"><div class="field"><label>Entry date</label><input id="entryDate" type="date" value="${dateNow()}"></div><div class="field"><label>Amount (₹)</label><input id="entryAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 20+20+30"></div></div>
+   <p id="entryAmountPreview" class="status" style="margin:0 0 10px">Calculated amount: —</p>
    <div class="field"><label>Note (optional)</label><input id="entryNote" placeholder="Tea, snacks, groceries..."></div>
    <div class="row"><button id="creditBtn">Add credit</button><button id="paymentBtn" class="secondary">Record payment</button></div>
    <div class="row" style="margin-top:18px"><h2 style="margin:0">Transaction history</h2><button id="exportBtn" class="secondary fit">Export CSV</button></div>
@@ -265,8 +270,10 @@ updateEntryAmountPreview();
   try{const result=expression();return i===tokens.length&&Number.isFinite(result)?result:null;}catch(e){return null;}
  }
  async function addEntry(type){
-  const amount = calculateAmountExpression($('entryAmount').value);
-  if(!(amount>0)||!Number.isFinite(amount))return toast('Enter a valid amount.');
+  const amount=calculateAmountExpression($('entryAmount').value);
+  const date=$('entryDate').value;
+  const note=$('entryNote').value.trim();
+  if(!(amount>0)||!Number.isFinite(amount))return toast('Enter a valid amount or calculation.');
   if(!date)return toast('Choose a date.');
   const item={id:uid(),customer_id:selected,entry_date:date,type,amount,note,created_at:new Date().toISOString()};
   if(CLOUD){const {error}=await db.from('ledger_entries').insert({id:item.id,customer_id:item.customer_id,entry_date:date,type,amount,note});if(error)return toast(error.message);}
